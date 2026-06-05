@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>¡¡¡FELIZ CUMPLEAÑOS!!!</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      overflow: hidden;
+      min-height: 100vh;
+      touch-action: none; /* Previene scroll al tocar en celulares */
+    }
+    
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    svg {
+      position: absolute;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    
+    .heart-text {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      font-size: 28px;
+      font-weight: bold;
+      text-align: center;
+      width: 100%;
+      font-family: 'Segoe UI', sans-serif;
+      text-shadow: 0 0 10px #ff0080, 0 0 20px #ff0080, 0 0 30px #ff0080;
+      z-index: 100;
+      animation: glow 2s ease-in-out infinite;
+    }
+    
+    /* Media query para que el texto no se rompa en celulares */
+    @media (max-width: 768px) {
+      .heart-text {
+        font-size: 20px;
+        bottom: 30px;
+        padding: 0 15px;
+      }
+    }
+    
+    @keyframes glow {
+      0%, 100% { text-shadow: 0 0 10px #ff0080, 0 0 20px #ff0080; }
+      50% { text-shadow: 0 0 20px #ff0080, 0 0 40px #ff0080, 0 0 60px #ff0080; }
+    }
+  </style>
+</head>
+<body>
+  <!-- SVG oculto solo para extraer los puntos matemáticos -->
+  <svg viewBox="0 0 600 600">
+    <path class="heart-path" 
+          d="M300 320 
+             C 300 320, 180 180, 180 260 
+             C 180 340, 300 420, 300 420 
+             C 300 420, 420 340, 420 260 
+             C 420 180, 300 320, 300 320" />
+  </svg>
+
+  <div id="canvas-container"></div>
+  <div class="heart-text">❤️ Te Amo Miamor Feliz Cumpleaños ❤️</div>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+    import { gsap } from 'https://cdn.skypack.dev/gsap@3.10.0';
+    
+    const tl = gsap.timeline();
+    const scene = new THREE.Scene();
+    
+    // ========== CÁMARA RESPONSIVE ==========
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 2000);
+    // Si es celular, alejamos la cámara para que se vea el corazón completo
+    camera.position.z = window.innerWidth < 768 ? 1300 : 800;
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita pixeles extra para mejor rendimiento
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+    
+    // ========== OBTENER VÉRTICES ==========
+    const path = document.querySelector('.heart-path');
+    const length = path.getTotalLength();
+    const vertices = [];
+    
+    // Paso de 0.8 en vez de 0.5 para reducir carga geométrica en móviles sin perder forma
+    for (let i = 0; i < length; i += 0.8) {
+        const point = path.getPointAtLength(i);
+        const vector = new THREE.Vector3(
+            point.x - 300, 
+            -(point.y - 300), 
+            0
+        );
+        
+        vector.x += (Math.random() - 0.5) * 40;
+        vector.y += (Math.random() - 0.5) * 40;
+        vector.z += (Math.random() - 0.5) * 100;
+        
+        vertices.push(vector);
+        
+        // Animación GSAP de los vectores
+        tl.from(vector, {
+            x: (Math.random() - 0.5) * 2000,
+            y: (Math.random() - 0.5) * 2000,
+            z: (Math.random() - 0.5) * 2000,
+            ease: "power2.inOut",
+            duration: gsap.utils.random(2, 4)
+        }, i * 0.002);
+    }
+    
+    // ========== SISTEMA DE PARTÍCULAS OPTIMIZADO ==========
+    const geometry = new THREE.BufferGeometry().setFromPoints(vertices);
+    
+    const material = new THREE.PointsMaterial({ 
+        color: 0xff1493, size: 5, sizeAttenuation: true, 
+        transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending
+    });
+    const material2 = new THREE.PointsMaterial({ 
+        color: 0x00ffff, size: 3, sizeAttenuation: true, 
+        transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending
+    });
+    
+    // Usamos UNA SOLA geometría para dos materiales = 50% menos consumo de RAM
+    const particles = new THREE.Points(geometry, material);
+    const particles2 = new THREE.Points(geometry, material2);
+    
+    const heartGroup = new THREE.Group();
+    heartGroup.add(particles, particles2);
+    scene.add(heartGroup);
+    
+    tl.to(heartGroup.scale, {
+        x: 1.15, y: 1.15, z: 1.15,
+        duration: 0.6, ease: "power1.inOut", repeat: -1, yoyo: true
+    }, ">");
+    
+    // ========== EFECTO PARALLAX INTERACTIVO ==========
+    let mouseX = 0, mouseY = 0;
+    const updateMouse = (x, y) => {
+        mouseX = (x / window.innerWidth) * 2 - 1;
+        mouseY = -(y / window.innerHeight) * 2 + 1;
+    };
+    window.addEventListener('mousemove', e => updateMouse(e.clientX, e.clientY));
+    window.addEventListener('touchmove', e => updateMouse(e.touches[0].clientX, e.touches[0].clientY));
+    
+    // ========== EVENTO RESPONSIVE ==========
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.position.z = window.innerWidth < 768 ? 1300 : 800;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    // ========== RENDER LOOP ==========
+    let time = 0;
+    function animate() {
+        requestAnimationFrame(animate);
+        time += 0.01;
+        
+        // CRÍTICO: Actualizar la geometría en cada frame para que GSAP funcione
+        const positions = geometry.attributes.position.array;
+        for (let i = 0; i < vertices.length; i++) {
+            positions[i * 3] = vertices[i].x;
+            positions[i * 3 + 1] = vertices[i].y;
+            positions[i * 3 + 2] = vertices[i].z;
+        }
+        geometry.attributes.position.needsUpdate = true;
+        
+        // Rotación general y Parallax
+        heartGroup.rotation.y += 0.005;
+        scene.rotation.x += (mouseY * 0.3 - scene.rotation.x) * 0.05;
+        scene.rotation.y += (mouseX * 0.3 - scene.rotation.y) * 0.05;
+        
+        // Pulsación de color
+        const hue = (time * 20) % 360;
+        material.color.setHSL(hue / 360, 1, 0.5);
+        material2.color.setHSL((hue + 180) / 360, 1, 0.5);
+        
+        renderer.render(scene, camera);
+    }
+    
+    animate();
+    tl.play();
+  </script>
+</body>
+</html>
